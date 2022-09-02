@@ -8,7 +8,8 @@ import (
 	"github.com/slack-go/slack"
 )
 
-func RegisterRSSToChannel(api *slack.Client, channelName string, rssLink *url.URL) error {
+// チャンネルがなければ作って、/feed listでなければ /feed rssLink で登録する。
+func RegisterRSSToNewChannel(api *slack.Client, channelName string, rssLink *url.URL) error {
 	// url := rssLink.String()
 
 	// get all channels
@@ -31,6 +32,5 @@ func createChannelName(baseURL *url.URL) string {
 	}
 	channelName = strings.Replace(channelName, "/", "_", -1)
 	channelName = strings.Replace(channelName, ".", "_", -1)
-	fmt.Println(channelName)
 	return channelName
 }

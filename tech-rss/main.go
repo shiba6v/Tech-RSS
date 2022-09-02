@@ -32,13 +32,14 @@ func run(opts *Options) error {
 			return errors.WithStack(err)
 		}
 		channelName := createChannelName(u)
+		fmt.Println(channelName)
 		if !contains(allChannes, channelName) {
 			rssLinks, err := getRSS(u)
 			if err != nil {
 				return err
 			}
 			// チャンネルがないなら作る。
-			if err := RegisterRSSToChannel(api, channelName, rssLinks[0]); err != nil {
+			if err := RegisterRSSToNewChannel(api, channelName, rssLinks[0]); err != nil {
 				return err
 			}
 		}
