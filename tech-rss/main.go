@@ -6,15 +6,16 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"strings"
 
+	"github.com/slack-go/slack"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )
 
 type Options struct {
-	URLPath string
+	URLPath       string
+	SlackAPIToken string
 }
 
 func FindAttr(
@@ -44,39 +45,41 @@ func FindTag[T comparable](
 	}
 }
 
-func ToAbsURLs(baseURL string, rssLinks []string) []string {
-	results := make([]string, len(rssLinks))
-	for i, rss := range rssLinks {
-		u, err := url.Parse(rss)
-		if err != nil {
-			continue
-		}
-		if u.IsAbs() {
-			results[i] = rss
+func ToAbsURLs(baseURL *url.URL, rssURLs []*url.URL) []string {
+	results := make([]string, len(rssURLs))
+	for i, rss := range rssURLs {
+		if rss.IsAbs() {
+			results[i] = rss.String()
 		} else {
-			results[i] = path.Join(baseURL, rss)
+			rss.Scheme = baseURL.Scheme
+			rss.Host = baseURL.Host
+			results[i] = rss.String()
 		}
 	}
 	return results
 }
 
-func rssFinder(n *html.Node) (t string, ok bool) {
+func rssFinder(n *html.Node) (t *url.URL, ok bool) {
 	if n.DataAtom != atom.Link {
-		return "", false
+		return nil, false
 	}
 	typeAttr, ok := FindAttr(n, "type")
 	if !ok || typeAttr != "application/atom+xml" {
-		return "", false
+		return nil, false
 	}
 	href, ok := FindAttr(n, "href")
 	if !ok {
-		return "", false
+		return nil, false
 	}
-	return href, true
+	hrefURL, err := url.Parse(href)
+	if err != nil {
+		return nil, false
+	}
+	return hrefURL, true
 }
 
-func GetRSS(baseURL string) ([]string, error) {
-	res, err := http.Get(baseURL)
+func GetRSS(baseURL *url.URL) ([]string, error) {
+	res, err := http.Get(baseURL.String())
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +88,7 @@ func GetRSS(baseURL string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	rssLinks := make([]string, 0)
+	rssLinks := make([]*url.URL, 0)
 	FindTag(doc, rssFinder, &rssLinks)
 	results := ToAbsURLs(baseURL, rssLinks)
 	return results, nil
@@ -100,17 +103,34 @@ func GetURLs(path string) ([]string, error) {
 	return urls, nil
 }
 
+func RegisterRSSToChannel(api *slack.Client, rssLink string) error {
+	// name :=
+	// channel, err := api.CreateConversation(, false)
+	return nil
+}
+
 func run(opts *Options) error {
 	urls, err := GetURLs(opts.URLPath)
+	api := slack.New(opts.SlackAPIToken)
 	if err != nil {
 		return fmt.Errorf("GetURLs failed:%w, ", err)
 	}
-	for _, u := range urls {
-		urls, err := GetRSS(u)
+	for _, urlString := range urls {
+		u, err := url.Parse(urlString)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("%v", urls)
+		rssLinks, err := GetRSS(u)
+		if err != nil {
+			return err
+		}
+		if len(rssLinks) == 0 {
+			return fmt.Errorf("the page does not have RSS: %s", u)
+		}
+		if err := RegisterRSSToChannel(api, rssLinks[0]); err != nil {
+			return err
+		}
+		fmt.Printf("%v", rssLinks)
 	}
 	return nil
 }
@@ -118,6 +138,7 @@ func run(opts *Options) error {
 func main() {
 	opts := Options{}
 	flag.StringVar(&opts.URLPath, "url_path", "../data/url.txt", "text file")
+	flag.StringVar(&opts.SlackAPIToken, "slack_api_token", "", "slack api token")
 	flag.Parse()
 	if err := run(&opts); err != nil {
 		panic(err)
