@@ -94,6 +94,9 @@ func GetRSS(baseURL *url.URL) ([]*url.URL, error) {
 	rssLinks := make([]*url.URL, 0)
 	FindTag(doc, rssFinder, &rssLinks)
 	results := ToAbsURLs(baseURL, rssLinks)
+	if len(rssLinks) == 0 {
+		return nil, fmt.Errorf("the page does not have RSS: %v", baseURL)
+	}
 	return results, nil
 }
 
@@ -109,8 +112,7 @@ func GetURLs(path string) ([]string, error) {
 	return urls, nil
 }
 
-func RegisterRSSToChannel(api *slack.Client, baseURL *url.URL, rssLink *url.URL) error {
-	// url := rssLink.String()
+func createChannelName(baseURL *url.URL) string {
 	var channelName string
 	if baseURL.Path == "" {
 		channelName = baseURL.Host
@@ -120,8 +122,30 @@ func RegisterRSSToChannel(api *slack.Client, baseURL *url.URL, rssLink *url.URL)
 	channelName = strings.Replace(channelName, "/", "_", -1)
 	channelName = strings.Replace(channelName, ".", "_", -1)
 	fmt.Println(channelName)
+	return channelName
+}
+
+func RegisterRSSToChannel(api *slack.Client, channelName string, rssLink *url.URL) error {
+	// url := rssLink.String()
+
+	// get all channels
+	//
 	// channel, err := api.CreateConversation(, false)
 	return nil
+}
+
+func GetAllChannelNames(api *slack.Client) ([]*string, error) {
+	// TODO Slack API
+	return nil, nil
+}
+
+func Contains[T comparable](all []*T, target T) bool {
+	for _, item := range all {
+		if *item == target {
+			return true
+		}
+	}
+	return false
 }
 
 func run(opts *Options) error {
@@ -130,6 +154,12 @@ func run(opts *Options) error {
 	if err != nil {
 		return fmt.Errorf("GetURLs failed:%w, ", err)
 	}
+
+	allChannes, err := GetAllChannelNames(api)
+	if err != nil {
+		return nil
+	}
+
 	for _, urlString := range urls {
 		u, err := url.Parse(urlString)
 		if err != nil {
@@ -139,11 +169,12 @@ func run(opts *Options) error {
 		if err != nil {
 			return err
 		}
-		if len(rssLinks) == 0 {
-			return fmt.Errorf("the page does not have RSS: %s", u)
-		}
-		if err := RegisterRSSToChannel(api, u, rssLinks[0]); err != nil {
-			return err
+		channelName := createChannelName(u)
+		if !Contains(allChannes, channelName) {
+			// チャンネルがないなら作る。
+			if err := RegisterRSSToChannel(api, channelName, rssLinks[0]); err != nil {
+				return err
+			}
 		}
 		// fmt.Printf("%v\n", rssLinks)
 	}
