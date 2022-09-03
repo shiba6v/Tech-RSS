@@ -1,1 +1,8 @@
 https://go.dev/blog
+# https://engineering.mercari.com/
+# https://engineering.linecorp.com/ja/blog
+# https://engineer.recruit-lifestyle.co.jp/techblog/
+# https://engineering.dena.com/
+# https://techblog.yahoo.co.jp/
+# https://labs.gree.jp/blog/
+# https://blog.colopl.dev/

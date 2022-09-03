@@ -15,16 +15,23 @@ type Options struct {
 }
 
 func run(opts *Options) error {
-	urls, err := getURLs(opts.URLPath)
 	api := slack.New(opts.SlackAPIToken)
+	db, err := setupDB()
+	if err != nil {
+		return err
+	}
+
+	urls, err := getURLs(opts.URLPath)
+
 	if err != nil {
 		return fmt.Errorf("GetURLs failed:%w, ", err)
 	}
 
 	allChannes, err := getAllChannelNames(api)
 	if err != nil {
-		return nil
+		return err
 	}
+	fmt.Println(allChannes)
 
 	for _, urlString := range urls {
 		u, err := url.Parse(urlString)
@@ -33,16 +40,19 @@ func run(opts *Options) error {
 		}
 		channelName := createChannelName(u)
 		fmt.Println(channelName)
-		if !contains(allChannes, channelName) {
-			rssLinks, err := getRSS(u)
-			if err != nil {
-				return err
-			}
-			// チャンネルがないなら作る。
-			if err := RegisterRSSToNewChannel(api, channelName, rssLinks[0]); err != nil {
+		// チャンネルがないなら作る。
+		if _, ok := allChannes[channelName]; !ok {
+			if err := RegisterRSSToNewChannel(api, channelName); err != nil {
 				return err
 			}
 		}
+
+		rssLinks, err := getRSS(u)
+		if err != nil {
+			return err
+		}
+		CreateSubscription(db, rssLinks[0].String(), channelName)
+
 		// fmt.Printf("%v\n", rssLinks)
 	}
 	return nil
